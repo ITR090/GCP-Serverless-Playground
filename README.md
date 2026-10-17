@@ -59,4 +59,3 @@ EXTRACT_TRANSLATE_TEXT_FUNCTION_HTTP=
 * Ensure billing is enabled on GCP.
 * Enable required APIs such as: Cloud Storage, Pub/Sub, Cloud Translation API and Cloud Run Functions.
 
-Vite Website : https://fullstack-app-afp-69338693715.europe-west1.run.app/
