@@ -1,29 +1,42 @@
-import React from 'react'
-import { Outlet } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 // components
 import Sidebar from '../components/Sidebar.jsx'
 import Navbar from '../components/Navbar.jsx'
+import Footer from '../components/Footer.jsx'
 
-const Layout = ()=>{
+const Layout = () => {
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const { pathname } = useLocation();
+
+    // close the mobile drawer and jump to top whenever the page changes
+    useEffect(() => {
+        setDrawerOpen(false);
+        window.scrollTo(0, 0);
+    }, [pathname]);
+
     return (
-         <div className="drawer">
-            <input id="my-drawer-2" type="checkbox" className="drawer-toggle" />
-            <div className="drawer-content flex flex-col">
-                {/* Navbar */}
+        <div className="drawer min-h-screen bg-base-200">
+            <input
+                id="app-drawer"
+                type="checkbox"
+                className="drawer-toggle"
+                checked={drawerOpen}
+                onChange={(e) => setDrawerOpen(e.target.checked)}
+            />
+            <div className="drawer-content flex min-h-screen flex-col">
                 <Navbar />
-                {/* Page content here */}
-                <Outlet />
+                <main className="flex-1">
+                    <Outlet />
+                </main>
+                <Footer />
             </div>
-            <div className="drawer-side">
-                <label htmlFor="my-drawer-2" aria-label="close sidebar" className="drawer-overlay"></label>
-                <ul className="menu bg-base-200 min-h-full w-80 p-4">
-                    {/* Sidebar content here */}
-                    <Sidebar />
-                </ul>
+            <div className="drawer-side z-40">
+                <label htmlFor="app-drawer" aria-label="Close menu" className="drawer-overlay"></label>
+                <Sidebar />
             </div>
         </div>
     )
 }
-
 
 export default Layout

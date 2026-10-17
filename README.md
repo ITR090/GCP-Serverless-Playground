@@ -25,13 +25,13 @@
 1. Create GCP Account and Enable Billing.
 2. Start React Frontend:
 ```
-cd client
+cd frontend
 npm install
 npm run dev
 ```
 3. Start Node.js Backend:
 ```
-cd server
+cd backend-api
 npm install
 npm run start
 ```

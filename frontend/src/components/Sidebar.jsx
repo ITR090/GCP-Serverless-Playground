@@ -1,12 +1,27 @@
 import React from 'react';
-import { Link } from 'react-router-dom'; 
+import { NavLink } from 'react-router-dom';
+import Brand from './Brand.jsx';
+import { NAV_ITEMS } from '../lib/nav.js';
 
-const Sidebar = () => {   
+const Sidebar = () => {
     return (
-        <>
-           <li><Link to={'landmark-detection'}>landmark-detection</Link></li>
-           <li><Link to={'document-translator'}>document-translator</Link></li>
-        </>
+        <aside className="flex min-h-full w-72 flex-col gap-6 bg-base-100 p-5">
+            <Brand />
+            <ul className="menu w-full gap-1 p-0">
+                {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+                    <li key={to}>
+                        <NavLink
+                            to={to}
+                            end={end}
+                            className={({ isActive }) => `gap-3 py-3 ${isActive ? 'menu-active' : ''}`}
+                        >
+                            <Icon className="h-5 w-5" />
+                            {label}
+                        </NavLink>
+                    </li>
+                ))}
+            </ul>
+        </aside>
     )
 }
 

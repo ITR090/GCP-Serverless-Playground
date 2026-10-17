@@ -21,7 +21,12 @@ app.use(express.static(path.join(__dirname, 'dist')));
 //console.log("GOOGLE_APPLICATION_CREDENTIALS:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
 
-const upload = multer({ storage: multer.memoryStorage() });
+// 10 MB matches the limit shown in the UI
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } });
+
+// prefix with a timestamp so two uploads with the same name don't overwrite each other
+const uniqueName = (originalname) => `${Date.now()}-${originalname.replace(/[^\w.-]/g, '_')}`;
 
 async function generateSignedUrl(bucketName, fileName) {
 
@@ -54,7 +59,8 @@ app.post('/api/uploadLandmark', upload.single('file'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG allowed.' });
     }
 
-    const blob = storage.bucket(BUCKET_NAME).file(`landmarks/${req.file.originalname}`);
+    const objectName = `landmarks/${uniqueName(req.file.originalname)}`;
+    const blob = storage.bucket(BUCKET_NAME).file(objectName);
     const blobStream = blob.createWriteStream({
       resumable: false,
       metadata: {
@@ -73,7 +79,7 @@ app.post('/api/uploadLandmark', upload.single('file'), async (req, res) => {
 
       try {
         const cloudFunctionUrl = process.env.LANDMARK_DETECTION_FUNCTION_HTTP;
-        const uploadedGcsUri = `gs://${BUCKET_NAME}/landmarks/${req.file.originalname}`;
+        const uploadedGcsUri = `gs://${BUCKET_NAME}/${objectName}`;
         const cfResponse = await fetch(cloudFunctionUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -83,13 +89,16 @@ app.post('/api/uploadLandmark', upload.single('file'), async (req, res) => {
 
         if (cfResponse.status == 200) {
           // signed url to access image
-          const url = await generateSignedUrl(BUCKET_NAME, `landmarks/${req.file.originalname}`);
-          res.status(200).json({ message: data, url: url });
+          const url = await generateSignedUrl(BUCKET_NAME, objectName);
+          return res.status(200).json({ message: data, url: url });
         }
 
         if (cfResponse.status == 400) {
-          return res.status(cfResponse.status).json({ message: data.message || 'Error processing image' });
+          return res.status(400).json({ message: data.message || 'Error processing image' });
         }
+
+        // any other status from the function: always answer so the client doesn't hang
+        return res.status(502).json({ message: 'Landmark detection is unavailable right now. Please try again later.' });
 
 
       } catch (error) {
@@ -121,7 +130,8 @@ app.post('/api/documentTranslator', upload.single('file'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG allowed.' });
     }
 
-    const blob = storage.bucket(BUCKET_NAME).file(`documents/${req.file.originalname}`);
+    const objectName = `documents/${uniqueName(req.file.originalname)}`;
+    const blob = storage.bucket(BUCKET_NAME).file(objectName);
     const blobStream = blob.createWriteStream({
       resumable: false,
       metadata: {
@@ -140,7 +150,7 @@ app.post('/api/documentTranslator', upload.single('file'), async (req, res) => {
 
       const messageData = {
         filename: req.file.originalname,
-        gcsUri: `gs://${BUCKET_NAME}/documents/${req.file.originalname}`,
+        gcsUri: `gs://${BUCKET_NAME}/${objectName}`,
         contentType: req.file.mimetype,
         timestamp: Date.now()
       };
@@ -148,7 +158,7 @@ app.post('/api/documentTranslator', upload.single('file'), async (req, res) => {
       try {
 
        const cloudFunctionUrl_1 = process.env.EXTRACT_TRANSLATE_TEXT_FUNCTION_HTTP;
-       const gcsUri = `gs://${BUCKET_NAME}/documents/${req.file.originalname}`;
+       const gcsUri = `gs://${BUCKET_NAME}/${objectName}`;
 
        const response  = await  axios.post(cloudFunctionUrl_1 ,{
         gcsUri: gcsUri,
@@ -156,10 +166,10 @@ app.post('/api/documentTranslator', upload.single('file'), async (req, res) => {
        }) 
 
        res.status(200).json({ message: response.data });
-         
+
       } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Upload failed' });
+        res.status(502).json({ message: "We couldn't extract or translate the text in this image. Please try again." });
       }
     })
 
@@ -172,6 +182,20 @@ app.post('/api/documentTranslator', upload.single('file'), async (req, res) => {
   }
 
 })
+
+// friendly message when the upload is too large
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ message: 'That file is too large. Please choose an image under 10 MB.' });
+  }
+  next(err);
+});
+
+// let React Router handle client-side routes (e.g. refreshing /landmark-detection)
+app.get('/{*splat}', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => console.log(`Listening on port ${port}`));

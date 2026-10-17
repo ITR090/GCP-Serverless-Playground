@@ -1,142 +1,145 @@
-import { useState } from "react";
+import { Languages, ImageUp, ScanText, Sparkles, ArrowRight, RotateCcw, Lightbulb, Zap } from "lucide-react";
 import Card from "../UI/Card";
-import FileUpload from "../UI/FileUpload";
-import api from "../lib/axios";
-// icon
-import { Copy, ArrowLeftRight } from "lucide-react";
+import FileDropzone from "../UI/FileDropzone";
+import PageHeader from "../UI/PageHeader";
+import StepList from "../UI/StepList";
+import CopyButton from "../UI/CopyButton";
+import useImageJob from "../hooks/useImageJob";
 // components
 import ErrorFeedback from "../components/ErrorFeedback";
 import Loading from "../components/Loading";
 
+const STEPS = [
+    { icon: ImageUp, title: "Upload an image", text: "A photo, screenshot or scan containing text (JPG or PNG)." },
+    { icon: ScanText, title: "Text is extracted", text: "OCR reads every line, even from photos taken at an angle." },
+    { icon: Languages, title: "Translated to Arabic", text: "Cloud Translation converts the text in seconds." },
+    { icon: Zap, title: "Copy and use it", text: "See both versions side by side and copy either one." },
+];
+
+const LOADING_MESSAGES = ["Uploading your image…", "Reading the text with OCR…", "Translating to Arabic…"];
+
+const parseTranslation = (data) => ({
+    original: data?.message?.data?.contents?.[0] ?? "",
+    translated: data?.message?.translatedText ?? "",
+});
+
 export default function DocumentTranslator() {
+    const job = useImageJob("/documentTranslator", parseTranslation);
+    const loading = job.status === "loading";
 
-    const [loading, setLoading] = useState(false);
-    const [feedback, setFeedback] = useState(null)
-
-    const handleDocumentTranslator = async (file) => {
-        
-        try {
-            setLoading(true);
-            const formData = new FormData();
-            formData.append("file", file);
-
-            // need to change the api endpoint
-            const response = await api.post(`/documentTranslator`, formData);
-
-            if (response.status === 200) {
-                // console.log(response)
-                setFeedback({
-                    status: "success",
-                    content: response.data.message.data.contents[0],
-                    translatedText: response.data.message.translatedText
-                })
-            }
-
-        } catch (error) {
-               // console.log(error)
-            if (error.status === 400) {
-                setFeedback({
-                    status: "error",
-                    message: error.response.data.message,
-                })
-            } else if (error.status === 500) {
-                setFeedback({
-                    status: "error",
-                    message: error.response.data.message,
-                })
-            } else {
-                // console.log(error)
-                setFeedback({
-                    status: "error",
-                    message: error.response.data.message,
-                })
-            }
-        } finally {
-            setLoading(false);
-        }
-
-    }
     return (
-        <Card>
-            <h1 className="text-2xl font-semibold my-2">AI-Powered Translator</h1>
+        <>
+            <PageHeader icon={Languages} eyebrow="Cloud Vision OCR · Cloud Translation" title="Translate text inside images">
+                Snap a sign, menu or document and get its text extracted and translated into Arabic, ready to copy.
+            </PageHeader>
 
-            <p className="my-2">
-                Easily translate text from  images, or photos using Google Cloud Vision and Translation APIs. 
-                The tool automatically extracts text with advanced OCR (Optical Character Recognition) 
-                and instantly translates it into your preferred language. 
-                
-            </p>
-
-            <div className="my-2 list">
-                <h2 className="text-lg font-semibold my-2">How it works:</h2>
-                <ol className="list-decimal list-inside">
-                    <li>📷 Upload a image (JPEG, PNG).</li>
-                    <li>🔎 The AI extracts the text using OCR technology.</li>
-                    <li>🌐 The extracted text is translated into your chosen language Beta (Arabic)</li>
-                    <li>⚡ Receive the translated text instantly on-screen.</li>
-                </ol>
-            </div>
-
-            <div className="w-full">
-                <FileUpload text="Upload Document" types='Word or Pdf up to 1 page' onFileChange={handleDocumentTranslator} />
-            </div>
-
-            {loading && <Loading />}
-
-
-            {feedback?.status == "success" && (
-                <div className="max-w-4xl mx-auto mt-10">
-                    <div className="text-center mb-6">
-                        <h1 className="text-2xl font-bold text-gray-800">
-                            Translation Result
-                        </h1>
-                        <p className="text-gray-500">English → Arabic</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                        {/* Original Language */}
-                        <div className="bg-white shadow-md rounded-2xl p-5 border border-gray-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-lg font-semibold text-gray-700">English</h3>
+            <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[1fr_320px]">
+                <div className="space-y-6">
+                    <Card>
+                        <FileDropzone
+                            file={job.file}
+                            onFileChange={job.setFile}
+                            onInvalid={job.showError}
+                            disabled={loading}
+                            label="Drop an image with text here"
+                        />
+                        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2 text-sm text-base-content/60">
+                                <span className="badge badge-ghost">Auto-detect</span>
+                                <ArrowRight className="h-4 w-4" />
+                                <span className="badge badge-primary badge-soft">Arabic</span>
+                            </div>
+                            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                                {job.file && !loading && (
+                                    <button type="button" className="btn btn-ghost" onClick={job.reset}>Clear</button>
+                                )}
                                 <button
-
-                                    className="text-gray-500 hover:text-gray-700"
+                                    type="button"
+                                    className="btn btn-primary sm:min-w-44"
+                                    onClick={job.submit}
+                                    disabled={!job.file || loading}
                                 >
-                                    <Copy size={18} />
+                                    {loading ? <span className="loading loading-spinner loading-sm" /> : <Sparkles className="h-4 w-4" />}
+                                    {loading ? "Translating…" : "Extract & translate"}
                                 </button>
                             </div>
-
-                            <p className="text-gray-800 whitespace-pre-wrap leading-6">
-                                {feedback?.content}
-                            </p>
                         </div>
+                    </Card>
 
-                        {/* Translated Language */}
-                        <div className="bg-white shadow-md rounded-2xl p-5 border border-gray-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-lg font-semibold text-gray-700">Arabic</h3>
-                                <button
+                    {loading && <Loading messages={LOADING_MESSAGES} />}
 
-                                    className="text-gray-500 hover:text-gray-700"
-                                >
-                                    <Copy size={18} />
-                                </button>
-                            </div>
+                    {job.status === "error" && (
+                        <ErrorFeedback
+                            message={job.error}
+                            onRetry={job.file ? job.submit : undefined}
+                            onDismiss={job.dismissError}
+                        />
+                    )}
 
-                            <p
-                                className="text-gray-800 whitespace-pre-wrap leading-7 text-right"
-                                dir="rtl"
-                            >
-                                {feedback?.translatedText}
-                            </p>
-                        </div>
-                    </div>
+                    {job.status === "success" && <TranslationResult result={job.result} onReset={job.reset} />}
                 </div>
-            )}
 
-            {feedback?.status == "error" && <ErrorFeedback message={feedback.message} />}
-
-        </Card>
+                <aside className="space-y-6">
+                    <Card>
+                        <h2 className="mb-4 font-semibold">How it works</h2>
+                        <StepList steps={STEPS} />
+                    </Card>
+                    <div className="flex gap-3 rounded-box border border-warning/30 bg-warning/10 p-4 text-sm">
+                        <Lightbulb className="h-5 w-5 shrink-0 text-warning" />
+                        <p>Tip: keep the text in focus and avoid glare. One page per image gives the best results.</p>
+                    </div>
+                </aside>
+            </div>
+        </>
     )
+}
+
+function TranslationResult({ result, onReset }) {
+    const { original, translated } = result;
+
+    if (!original.trim()) {
+        return (
+            <div className="animate-fade-up alert alert-warning alert-soft">
+                <ScanText className="h-5 w-5" />
+                <div className="flex-1">
+                    <p className="font-semibold">No text found</p>
+                    <p className="text-sm">We couldn't find any readable text in that image. Try a sharper photo.</p>
+                </div>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={onReset}>Try another</button>
+            </div>
+        );
+    }
+
+    return (
+        <section className="animate-fade-up space-y-4" aria-live="polite">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">Translation result</h2>
+                <button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={onReset}>
+                    <RotateCcw className="h-4 w-4" /> Translate another
+                </button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+                <TextPanel title="Original" text={original} />
+                <TextPanel title="Arabic" text={translated} rtl highlight />
+            </div>
+        </section>
+    );
+}
+
+function TextPanel({ title, text, rtl = false, highlight = false }) {
+    return (
+        <div className={`flex flex-col rounded-box border bg-base-100 shadow-sm ${highlight ? "border-primary/40" : "border-base-300"}`}>
+            <div className="flex items-center justify-between border-b border-base-300 px-4 py-2.5">
+                <h3 className={`text-sm font-semibold ${highlight ? "text-primary" : "text-base-content/70"}`}>{title}</h3>
+                <CopyButton text={text} />
+            </div>
+            <p
+                dir={rtl ? "rtl" : "auto"}
+                lang={rtl ? "ar" : undefined}
+                className={`max-h-96 overflow-y-auto whitespace-pre-wrap p-4 ${rtl ? "text-right text-lg leading-8" : "leading-7"}`}
+            >
+                {text}
+            </p>
+        </div>
+    );
 }
